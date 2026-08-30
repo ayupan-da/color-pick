@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Color Picker</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;background:#f7f7f8;color:#222}
+header{position:sticky;top:0;z-index:10;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);padding:14px 16px;border-bottom:1px solid #ddd}
+h1{font-size:20px;margin:0 0 10px}
+.status{font-size:14px;color:#666}
+.selected{display:grid;grid-template-columns:repeat(10,1fr);gap:5px;margin-top:10px}
+.selected .swatch{aspect-ratio:1;border-radius:8px;border:1px solid #ddd;position:relative;min-width:0}
+.selected .swatch.empty{background:#eee;border:1px dashed #bbb}
+.selected .num{position:absolute;top:3px;left:4px;font-size:10px;background:rgba(255,255,255,.75);border-radius:4px;padding:1px 3px}
+.controls{padding:14px 16px 5px}
+.categories{display:flex;gap:7px;overflow-x:auto;padding-bottom:8px}
+button{border:1px solid #d5d5d5;background:white;border-radius:999px;padding:7px 12px;font-size:13px;white-space:nowrap}
+button.active{background:#222;color:white;border-color:#222}
+.grid{padding:10px 16px 30px;display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:9px}
+.color{aspect-ratio:1;border-radius:12px;border:2px solid transparent;box-shadow:0 1px 4px #0001;cursor:pointer;position:relative}
+.color.selectedColor{border-color:#111;box-shadow:0 0 0 3px white,0 0 0 5px #111}
+.check{position:absolute;right:5px;top:5px;background:#fff;color:#111;border-radius:50%;width:21px;height:21px;text-align:center;line-height:21px;font-size:13px;box-shadow:0 1px 3px #0003}
+.colorName{font-size:10px;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-top:3px}
+.wrap{min-width:0}
+.reset{margin-left:auto}
+.actions{display:flex;align-items:center;gap:8px}
+@media(max-width:600px){.selected{grid-template-columns:repeat(5,1fr)}.grid{grid-template-columns:repeat(5,1fr);gap:7px}.colorName{font-size:9px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="actions">
+    <h1>🎨 カラーパレット</h1>
+    <button class="reset" onclick="clearAll()">全解除</button>
+  </div>
+  <div class="status" id="status">選択中：0 / 10色</div>
+  <div class="selected" id="selected"></div>
+</header>
+
+<div class="controls">
+  <div class="categories" id="categories"></div>
+</div>
+<div class="grid" id="grid"></div>
+
+<script>
+const palettes = {
+  "赤": ["#5C0011","#7A0019","#99001B","#B00020","#C62828","#D32F2F","#E53935","#EF5350","#F44336","#FF5252","#FF6B6B","#FF8A80","#FFCDD2","#FFEBEE"],
+  "橙": ["#7F2704","#9A3412","#C2410C","#D65A00","#E65100","#EF6C00","#F57C00","#FB8C00","#FF9800","#FFB74D","#FFCC80","#FFE0B2","#FFF3E0"],
+  "黄": ["#665C00","#827717","#9E9D24","#AFB42B","#C0CA33","#CDDC39","#D4E157","#E6EE9C","#F0F4C3","#F9A825","#FBC02D","#FDD835","#FFEB3B","#FFF59D","#FFF9C4"],
+  "黄緑": ["#365314","#3F6212","#4D7C0F","#65A30D","#84CC16","#8BC34A","#9CCC65","#AED581","#C5E1A5","#D9F99D","#ECFCCB"],
+  "緑": ["#064E3B","#065F46","#047857","#059669","#10B981","#16A34A","#22C55E","#43A047","#4CAF50","#66BB6A","#81C784","#A5D6A7","#C8E6C9","#E8F5E9"],
+  "青緑": ["#042F2E","#115E59","#0F766E","#0D9488","#14B8A6","#26A69A","#4DB6AC","#80CBC4","#B2DFDB","#CCFBF1"],
+  "水色": ["#0C4A6E","#075985","#0369A1","#0284C7","#0EA5E9","#03A9F4","#29B6F6","#4FC3F7","#81D4FA","#B3E5FC","#E0F7FA"],
+  "青": ["#172554","#1E3A8A","#1D4ED8","#2563EB","#3B82F6","#1976D2","#2196F3","#42A5F5","#64B5F6","#90CAF9","#BFDBFE","#DBEAFE","#EFF6FF"],
+  "紫": ["#2E1065","#4C1D95","#5B21B6","#6D28D9","#7C3AED","#8B5CF6","#9C27B0","#AB47BC","#BA68C8","#CE93D8","#D8B4FE","#EDE9FE"],
+  "ピンク": ["#831843","#9D174D","#BE185D","#DB2777","#E11D48","#EC407A","#F06292","#F48FB1","#F8BBD0","#FCE4EC","#FF80AB","#FFB6C1","#FFE4E6"],
+  "茶": ["#3E2723","#4E342E","#5D4037","#6D4C41","#795548","#8D6E63","#A1887F","#BCAAA4","#D7CCC8","#EFEBE9","#78350F","#92400E","#B45309","#D97706","#F59E0B"],
+  "ベージュ": ["#5F4B32","#7A6548","#927B5A","#A89070","#B8A17A","#C8B28A","#D6C3A5","#E0C9A6","#E8D8BF","#F1E4CE","#F5E6CC","#FAF3E8"],
+  "グレー": ["#111827","#1F2937","#374151","#4B5563","#6B7280","#9CA3AF","#A3A3A3","#BDBDBD","#D1D5DB","#D6D6D6","#E5E7EB","#EEEEEE","#F3F4F6","#F9FAFB"],
+  "黒": ["#000000","#0A0A0A","#111111","#171717","#1C1C1C","#222222","#292929","#303030","#3A3A3A"],
+  "白": ["#FFFFFF","#FFFEFA","#FFFDF5","#FFFDF0","#FFF9E6","#F8FAFC","#F5F5F5","#FAFAFA"]
+};
+
+let selected=[];
+let category="すべて";
+
+function allColors(){
+  return Object.entries(palettes).flatMap(([cat,colors])=>colors.map((hex,i)=>({cat,hex,name:cat+(i+1)})));
+}
+const colors=allColors();
+
+function renderCategories(){
+  const el=document.getElementById("categories");
+  el.innerHTML="";
+  ["すべて",...Object.keys(palettes)].forEach(c=>{
+    const b=document.createElement("button");
+    b.textContent=c;
+    b.className=c===category?"active":"";
+    b.onclick=()=>{category=c;renderCategories();renderGrid()};
+    el.appendChild(b);
+  });
+}
+function renderGrid(){
+  const el=document.getElementById("grid"); el.innerHTML="";
+  const list=category==="すべて"?colors:colors.filter(x=>x.cat===category);
+  list.forEach(c=>{
+    const wrap=document.createElement("div"); wrap.className="wrap";
+    const b=document.createElement("div"); b.className="color";
+    b.style.background=c.hex;
+    const idx=selected.indexOf(c.hex);
+    if(idx>=0){
+      b.classList.add("selectedColor");
+      const check=document.createElement("span");check.className="check";check.textContent=idx+1;b.appendChild(check);
+    }
+    b.title=c.hex;
+    b.onclick=()=>toggle(c.hex);
+    wrap.appendChild(b);
+    const n=document.createElement("div");n.className="colorName";n.textContent=c.cat+(list.indexOf(c)+1);
+    wrap.appendChild(n);
+    el.appendChild(wrap);
+  });
+}
+function toggle(hex){
+  const i=selected.indexOf(hex);
+  if(i>=0) selected.splice(i,1);
+  else if(selected.length<10) selected.push(hex);
+  else { alert("選択できるのは最大10色です"); return; }
+  renderSelected();renderGrid();
+}
+function renderSelected(){
+  const el=document.getElementById("selected");el.innerHTML="";
+  for(let i=0;i<10;i++){
+    const s=document.createElement("div");s.className="swatch"+(selected[i]?"":" empty");
+    if(selected[i]){s.style.background=selected[i];const n=document.createElement("span");n.className="num";n.textContent=i+1;s.appendChild(n)}
+    el.appendChild(s);
+  }
+  document.getElementById("status").textContent=`選択中：${selected.length} / 10色`;
+}
+function clearAll(){selected=[];renderSelected();renderGrid()}
+renderCategories();renderSelected();renderGrid();
+</script>
+</body>
+</html>
