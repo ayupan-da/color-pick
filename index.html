@@ -14,12 +14,14 @@ h1{font-size:19px;margin:0;font-weight:700}
 button{font:inherit}
 .clear{border:1px solid #ccc;background:#fff;border-radius:999px;padding:7px 12px;font-size:13px}
 .status{margin-top:6px;color:#666;font-size:13px}
-.preview{display:flex;width:100%;height:180px;margin-top:10px;gap:2px;border-radius:10px;overflow:hidden;background:#eee}
+.preview{display:flex;width:100%;height:180px;margin-top:10px;gap:2px;border-radius:10px;overflow:hidden;background:#eee;
+  /* Safari(iOS)のsticky+backdrop-filter配下で再描画が走らないバグ対策：独立した描画レイヤーに乗せる */
+  transform:translateZ(0);-webkit-transform:translateZ(0);will-change:transform;}
 .preview.empty{display:grid;grid-template-columns:repeat(5,1fr);height:54px;gap:4px;background:transparent}
 .preview.empty .slot{background:#eee;border:1px dashed #bbb;border-radius:7px}
-.slot{position:relative;min-width:0;flex:1;border:1px solid #ddd}
-.slot .num{position:absolute;top:6px;left:6px;background:rgba(255,255,255,.82);border-radius:5px;padding:2px 5px;font-size:11px}
-.slot .code{position:absolute;left:5px;right:5px;bottom:6px;text-align:center;background:rgba(255,255,255,.86);border-radius:5px;padding:4px 2px;font-size:11px}
+.slot{position:relative;min-width:0;flex:1;height:100%;border:1px solid #ddd}
+.slot .num{position:absolute;top:6px;left:6px;background:rgba(255,255,255,.85);border-radius:5px;padding:2px 5px;font-size:11px;font-weight:700}
+.slot .code{position:absolute;left:4px;right:4px;bottom:6px;text-align:center;background:rgba(255,255,255,.9);border-radius:5px;padding:4px 2px;font-size:10.5px;font-weight:700;letter-spacing:.02em;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .filters{padding:12px 14px 4px}
 .categories{display:flex;gap:7px;overflow-x:auto;padding-bottom:7px;scrollbar-width:none}
 .categories::-webkit-scrollbar{display:none}
@@ -160,6 +162,7 @@ function renderPreview(){
       slot.className="slot";
       previewEl.appendChild(slot);
     }
+    forceRepaint();
     return;
   }
   previewEl.className="preview";
@@ -173,10 +176,18 @@ function renderPreview(){
     slot.appendChild(num);
     const code=document.createElement("span");
     code.className="code";
-    code.textContent=hex;
+    code.textContent=hex.toUpperCase();
     slot.appendChild(code);
     previewEl.appendChild(slot);
   });
+  forceRepaint();
+}
+
+// iOS Safariで position:sticky + backdrop-filter の内側にあるDOM更新が
+// 画面に反映されない(再描画されない)ことがあるバグへの保険。
+// 強制的にレイアウトを読ませて再描画をトリガーする。
+function forceRepaint(){
+  void previewEl.offsetHeight;
 }
 
 document.getElementById("clear").addEventListener("click",()=>{
